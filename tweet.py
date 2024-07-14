@@ -13,7 +13,7 @@ ACCESS_SECRET = os.getenv('ACCESS_SECRET')
 
 # ツイートを作成する
 def get_tweet_random():
-    file_path = "/root/bot_main/pieces.tsv"
+    file_path = "pieces.tsv"
     lines = open(file_path, encoding="utf-8").readlines()
     line = lines[random.randint(0, len(lines) - 1)]
     line = line.split("\t")
