@@ -2,11 +2,7 @@ name: Twitter Bot
 
 on:
   schedule:
-    - cron: '30 6,8,12,16,18,20,22 * * *'
-  # TODO 後で削除
-  push:
-    branches:
-      - master
+    - cron: '30 3,7,9,11,13,21,23 * * *'
 
 jobs:
   run-bot:
