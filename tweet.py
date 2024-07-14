@@ -26,8 +26,6 @@ def get_tweet_random():
 
 # 140字越えチェック
 def check_over_140(tweet):
-    print("文字数チェック")
-    print(len(tweet))
     if len(tweet) > 140:
         return True
 
@@ -41,6 +39,7 @@ client = tweepy.Client(
 
 # ツイートを作成
 tweet = get_tweet_random()
-print("以下のツイートを投稿します")
+print("以下のツイートを投稿します。")
 print(tweet)
 # client.create_tweet(text = tweet)
+print("投稿しました。")
