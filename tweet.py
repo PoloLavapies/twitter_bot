@@ -41,5 +41,5 @@ client = tweepy.Client(
 tweet = get_tweet_random()
 print("以下のツイートを投稿します。")
 print(tweet)
-# client.create_tweet(text = tweet)
+client.create_tweet(text = tweet)
 print("投稿しました。")
