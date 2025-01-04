@@ -12,10 +12,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Install Python 2.7
+    - name: Install Python 3
       run: |
         sudo apt-get update
-        sudo apt-get install python2.7
+        sudo apt-get install python3
 
     - name: Install dependencies
       run: |
