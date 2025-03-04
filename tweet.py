@@ -18,7 +18,10 @@ def get_tweet_random():
     line = lines[random.randint(0, len(lines) - 1)]
     line = line.split("\t")
 
-    tweet = "{0} / {1}\n{2}\n{3}".format(line[0], line[1], line[2], line[3][:-1])
+    sentence = line[3]
+    if sentence[-1] == "\n":
+        sentence = sentence[:-1]
+    tweet = "{0} / {1}\n{2}\n{3}".format(line[0], line[1], line[2], sentence)
     if (check_over_140(tweet)):
         return get_tweet_random()
 
