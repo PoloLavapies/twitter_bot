@@ -28,6 +28,20 @@ def load_tsv():
     return rows
 
 
+def send_email(title, body):
+    """Gmail SMTP でメールを送信"""
+    msg = MIMEText(body)
+    msg["Subject"] = title
+    msg["From"] = FROM_ADDRESS
+    msg["To"] = TO_ADDRESS
+    msg["Date"] = formatdate()
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(FROM_ADDRESS, FROM_PASSWORD)
+        server.sendmail(FROM_ADDRESS, TO_ADDRESS, msg.as_string())
+
+
 def check_length(rows, threshold=130):
     """文字数が閾値を超える行をメール通知"""
     results = []
@@ -92,19 +106,6 @@ def check_links(rows):
 FROM_ADDRESS = os.getenv('EMAIL_ADDRESS')
 TO_ADDRESS = FROM_ADDRESS
 FROM_PASSWORD = os.getenv('EMAIL_PASSWORD')
-
-def send_email(title, body):
-    """Gmail SMTP でメールを送信"""
-    msg = MIMEText(body)
-    msg["Subject"] = title
-    msg["From"] = FROM_ADDRESS
-    msg["To"] = TO_ADDRESS
-    msg["Date"] = formatdate()
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(FROM_ADDRESS, FROM_PASSWORD)
-        server.sendmail(FROM_ADDRESS, TO_ADDRESS, msg.as_string())
 
 
 def check_latest_tweet(username):

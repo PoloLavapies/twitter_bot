@@ -2,8 +2,8 @@ name: Twitter Bot Check
 
 on:
   schedule:
-  # TODO 1日に1回の稼働にする
-    - cron: '48 * * * *' # UTC
+    - cron: '0 21 * * *' # UTC
+  workflow_dispatch:
 
 jobs:
   check-bot:
