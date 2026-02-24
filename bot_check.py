@@ -42,7 +42,8 @@ def send_email(title, body):
         server.sendmail(FROM_ADDRESS, TO_ADDRESS, msg.as_string())
 
 
-def check_length(rows, threshold=130):
+# 140 だが、厳しめに設定
+def check_length(rows, threshold=135):
     """文字数が閾値を超える行をメール通知"""
     results = []
     for composer, title, desc, url in rows:
@@ -55,7 +56,7 @@ def check_length(rows, threshold=130):
         lines = "\n".join(f"{composer} {title} {length}文字" for composer, title, length in results)
         send_email(
             "【Bot監視】文字数超過",
-            f"以下のエントリが文字数上限（{threshold}文字）を超えています。\n\n{lines}",
+            f"以下が文字数上限（{threshold}文字）を超えています。\n\n{lines}",
         )
 
 
@@ -82,25 +83,18 @@ def is_link_dead(url):
 
 
 def check_links(rows):
-    """リンク切れをチェックして表示"""
-    print("=== リンク切れチェック中 ===")
     dead_links = []
     for i, (composer, title, desc, url) in enumerate(rows):
-        # TODO あとで消す
-        if i > 10:
-            break
         print(f"\r{i + 1}/{len(rows)} 件チェック中...", end="", flush=True)
         if is_link_dead(url):
             dead_links.append((composer, title, url))
 
     if dead_links:
-        print("=== リンク切れ ===")
-        for composer, title, url in dead_links:
-            print(f"{composer} {title}")
-            print(f"  {url}")
-    else:
-        print("リンク切れはありませんでした")
-    print()
+        lines = "\n".join(f"{composer} {title}\n  {url}" for composer, title, url in dead_links)
+        send_email(
+            "【Bot監視】リンク切れ",
+            f"以下のURLがリンク切れです。\n\n{lines}",
+        )
 
 
 FROM_ADDRESS = os.getenv('EMAIL_ADDRESS')
@@ -112,7 +106,7 @@ def check_latest_tweet(username):
     """最新ツイートが24時間以上前ならメール通知"""
     from playwright.sync_api import sync_playwright
 
-    print(f"=== @{username} の最新ツイートをチェック中 ===")
+    print(f"=== 最新ツイートをチェック中 ===")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -126,7 +120,7 @@ def check_latest_tweet(username):
                 print("最新ツイートの時刻を取得できませんでした（ログインウォールの可能性）")
                 send_email(
                     "【Bot監視】ツイート取得失敗",
-                    f"@{username} の最新ツイートを取得できませんでした。\nログインウォール等の可能性があります。",
+                    f"最新ツイートを取得できませんでした。\nログインウォール等の可能性があります。",
                 )
                 return
 

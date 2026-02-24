@@ -2,7 +2,7 @@ name: Twitter Bot Check
 
 on:
   schedule:
-    - cron: '0 21 * * *' # UTC
+    - cron: '0 10 * * *' # UTC
   workflow_dispatch:
 
 jobs:
