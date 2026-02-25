@@ -21,6 +21,7 @@ TO_ADDRESS = FROM_ADDRESS
 FROM_PASSWORD = os.getenv('EMAIL_PASSWORD')
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 
+
 def load_tsv():
     """TSVファイルを読み込み、(作曲者, 曲名, 説明, URL) のリストを返す"""
     rows = []
@@ -46,6 +47,40 @@ def send_email(title, body):
         server.sendmail(FROM_ADDRESS, TO_ADDRESS, msg.as_string())
 
 
+def check_latest_tweet():
+    """Botワークフローの最終成功実行が24時間以上前ならメール通知"""
+    api_url = "https://api.github.com/repos/PoloLavapies/twitter_bot/actions/workflows/twitter_bot.yml/runs?status=success&per_page=1"
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        runs = data.get("workflow_runs", [])
+
+        run_time = datetime.fromisoformat(runs[0]["updated_at"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        hours = (now - run_time).total_seconds() / 3600
+
+        if hours >= 24:
+            send_email(
+                "【Bot監視】24時間以上ツイートなし",
+                f"Botのワークフローが {hours:.1f} 時間実行されていません。\nBotが停止している可能性があります。",
+            )
+        else:
+            print(f"bot の最終実行は {hours:.1f} 時間前でした。")
+    except Exception as e:
+        send_email(
+            "【Bot監視】チェックエラー",
+            f"ワークフロー実行チェック中にエラーが発生しました。\n{e}",
+        )
+
+
 # 140 だが、厳しめに設定
 def check_length(rows, threshold=135):
     """文字数が閾値を超える行をメール通知"""
@@ -62,6 +97,8 @@ def check_length(rows, threshold=135):
             "【Bot監視】文字数超過",
             f"以下が文字数上限（{threshold}文字）を超えています。\n\n{lines}",
         )
+    else:
+        print(f"文字数上限 ({threshold}文字を超えるツイートはありませんでした。")
 
 
 def is_link_dead(url):
@@ -100,53 +137,15 @@ def check_links(rows):
             "【Bot監視】リンク切れ",
             f"以下のURLがリンク切れです。\n\n{lines}",
         )
-
-
-def check_latest_tweet():
-    """Botワークフローの最終成功実行が24時間以上前ならメール通知"""
-    api_url = "https://api.github.com/repos/PoloLavapies/twitter_bot/actions/workflows/twitter_bot.yml/runs?status=success&per_page=1"
-    try:
-        req = urllib.request.Request(
-            api_url,
-            headers={
-                "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github+json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-
-        runs = data.get("workflow_runs", [])
-        if not runs:
-            send_email(
-                "【Bot監視】ワークフロー実行履歴なし",
-                "twitter_bot のワークフロー実行履歴が見つかりませんでした。",
-            )
-            return
-
-        run_time = datetime.fromisoformat(runs[0]["updated_at"].replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        hours = (now - run_time).total_seconds() / 3600
-
-        if hours >= 24:
-            send_email(
-                "【Bot監視】24時間以上ツイートなし",
-                f"Botのワークフローが {hours:.1f} 時間実行されていません。\nBotが停止している可能性があります。",
-            )
-        else:
-            print(f"正常: 最終実行 {hours:.1f} 時間前")
-    except Exception as e:
-        send_email(
-            "【Bot監視】チェックエラー",
-            f"ワークフロー実行チェック中にエラーが発生しました。\n{e}",
-        )
+    else:
+        print("リンクが切れている動画はありませんでした。")
 
 
 def main():
     rows = load_tsv()
-    #check_length(rows)
-    #check_links(rows)
     check_latest_tweet()
+    check_length(rows)
+    check_links(rows)
 
 
 if __name__ == "__main__":
