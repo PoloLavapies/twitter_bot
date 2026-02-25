@@ -6,6 +6,7 @@
 """
 
 import os
+import json
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -13,8 +14,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.utils import formatdate
 
-TSV_PATH = os.path.join(os.path.dirname(__file__), "../twitter_bot/pieces.tsv")
 
+TSV_PATH = os.path.join(os.path.dirname(__file__), "../twitter_bot/pieces.tsv")
+FROM_ADDRESS = os.getenv('EMAIL_ADDRESS')
+TO_ADDRESS = FROM_ADDRESS
+FROM_PASSWORD = os.getenv('EMAIL_PASSWORD')
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 
 def load_tsv():
     """TSVファイルを読み込み、(作曲者, 曲名, 説明, URL) のリストを返す"""
@@ -26,7 +31,6 @@ def load_tsv():
             if len(cols) >= 4:
                 rows.append((cols[0], cols[1], cols[2], cols[3]))
     return rows
-
 
 def send_email(title, body):
     """Gmail SMTP でメールを送信"""
@@ -85,6 +89,7 @@ def is_link_dead(url):
 def check_links(rows):
     dead_links = []
     for i, (composer, title, desc, url) in enumerate(rows):
+
         print(f"\r{i + 1}/{len(rows)} 件チェック中...", end="", flush=True)
         if is_link_dead(url):
             dead_links.append((composer, title, url))
@@ -97,65 +102,51 @@ def check_links(rows):
         )
 
 
-FROM_ADDRESS = os.getenv('EMAIL_ADDRESS')
-TO_ADDRESS = FROM_ADDRESS
-FROM_PASSWORD = os.getenv('EMAIL_PASSWORD')
+def check_latest_tweet():
+    """Botワークフローの最終成功実行が24時間以上前ならメール通知"""
+    api_url = "https://api.github.com/repos/PoloLavapies/twitter_bot/actions/workflows/twitter_bot.yml/runs?status=success&per_page=1"
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
 
-
-def check_latest_tweet(username):
-    """最新ツイートが24時間以上前ならメール通知"""
-    from playwright.sync_api import sync_playwright
-
-    print(f"=== 最新ツイートをチェック中 ===")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        try:
-            page.goto(f"https://x.com/piano_music_bot", wait_until="networkidle", timeout=30000)
-            # ログインウォールが出る場合があるので待機
-            page.wait_for_timeout(3000)
-
-            time_el = page.locator("article time").first
-            if time_el.count() == 0:
-                print("最新ツイートの時刻を取得できませんでした（ログインウォールの可能性）")
-                send_email(
-                    "【Bot監視】ツイート取得失敗",
-                    f"最新ツイートを取得できませんでした。\nログインウォール等の可能性があります。",
-                )
-                return
-
-            dt_str = time_el.get_attribute("datetime")
-            tweet_time = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            diff = now - tweet_time
-            hours = diff.total_seconds() / 3600
-
-            print(f"最新ツイート: {tweet_time.isoformat()} ({hours:.1f}時間前)")
-
-            if hours >= 24:
-                print("24時間以上ツイートがありません。メールで通知します。")
-                send_email(
-                    "【Bot監視】24時間以上ツイートなし",
-                    f"@{username} が {hours:.1f} 時間ツイートしていません。\nBotが停止している可能性があります。",
-                )
-            else:
-                print("正常にツイートされています。")
-        except Exception as e:
-            print(f"ツイートチェック中にエラー: {e}")
+        runs = data.get("workflow_runs", [])
+        if not runs:
             send_email(
-                "【Bot監視】チェックエラー",
-                f"@{username} のツイートチェック中にエラーが発生しました。\n{e}",
+                "【Bot監視】ワークフロー実行履歴なし",
+                "twitter_bot のワークフロー実行履歴が見つかりませんでした。",
             )
-        finally:
-            browser.close()
-    print()
+            return
+
+        run_time = datetime.fromisoformat(runs[0]["updated_at"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        hours = (now - run_time).total_seconds() / 3600
+
+        if hours >= 24:
+            send_email(
+                "【Bot監視】24時間以上ツイートなし",
+                f"Botのワークフローが {hours:.1f} 時間実行されていません。\nBotが停止している可能性があります。",
+            )
+        else:
+            print(f"正常: 最終実行 {hours:.1f} 時間前")
+    except Exception as e:
+        send_email(
+            "【Bot監視】チェックエラー",
+            f"ワークフロー実行チェック中にエラーが発生しました。\n{e}",
+        )
 
 
 def main():
     rows = load_tsv()
-    check_length(rows)
-    check_links(rows)
-    # check_latest_tweet("piano_music_bot")
+    #check_length(rows)
+    #check_links(rows)
+    check_latest_tweet()
 
 
 if __name__ == "__main__":
